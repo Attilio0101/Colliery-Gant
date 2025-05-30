@@ -103,7 +103,7 @@ with st.sidebar:
                 "fine": dt_fine
             }
             st.success(f"Attività '{cod}' salvata in '{comm}'")
-            st.experimental_rerun()
+            st.rerun()
 
     st.subheader("🗑️ Elimina attività")
     if commesse_disponibili:
@@ -114,7 +114,7 @@ with st.sidebar:
             del st.session_state.commesse[selez_comm][selez_att]
             if not st.session_state.commesse[selez_comm]:
                 del st.session_state.commesse[selez_comm]
-            st.experimental_rerun()
+            st.rerun()
 
 # === VISUALIZZAZIONE GANTT ===
 commesse = st.session_state.commesse
