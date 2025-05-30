@@ -59,37 +59,47 @@ st.set_page_config(layout="wide")
 st.title("📅 Gantt Interattivo – Commesse Fotovoltaiche")
 
 ANNO = 2025
-commesse = {}
+if "commesse" not in st.session_state:
+    st.session_state.commesse = {}
 
 file = st.sidebar.file_uploader("📂 Carica file JSON", type="json")
 if file:
-    commesse = json.load(file)
-    for att in commesse.values():
+    st.session_state.commesse = json.load(file)
+    for att in st.session_state.commesse.values():
         for d in att.values():
             d["inizio"] = datetime.strptime(d["inizio"], "%Y-%m-%d")
             d["fine"] = datetime.strptime(d["fine"], "%Y-%m-%d")
 
 with st.sidebar:
     st.subheader("➕ Aggiungi attività")
-    comm = st.text_input("Commessa")
-    cod = st.text_input("Codice attività")
-    nome = st.text_input("Nome attività")
-    risorsa = st.text_input("Risorsa")
-    durata = st.number_input("Durata (gg lavorativi)", 1, 60, 5)
-    inizio = st.date_input("Data inizio", datetime(ANNO, 1, 2))
-    if st.button("Aggiungi"):
-        dt_inizio = datetime.combine(inizio, datetime.min.time())
-        dt_inizio = prossimo_lavorativo(dt_inizio)
-        dt_fine = aggiungi_lavorativi(dt_inizio, durata)
-        if comm not in commesse:
-            commesse[comm] = {}
-        commesse[comm][cod] = {
-            "nome": nome,
-            "risorsa": risorsa,
-            "durata": durata,
-            "inizio": dt_inizio,
-            "fine": dt_fine
-        }
+    with st.form("inserimento_attivita"):
+        comm = st.text_input("Commessa")
+        cod = st.text_input("Codice attività")
+        nome = st.text_input("Nome attività")
+        risorsa = st.text_input("Risorsa")
+        durata = st.number_input("Durata (gg lavorativi)", 1, 60, 5)
+        inizio = st.date_input("Data inizio", datetime(ANNO, 1, 2))
+        submitted = st.form_submit_button("Aggiungi")
+
+        if submitted:
+            dt_inizio = datetime.combine(inizio, datetime.min.time())
+            dt_inizio = prossimo_lavorativo(dt_inizio)
+            dt_fine = aggiungi_lavorativi(dt_inizio, durata)
+            if comm not in st.session_state.commesse:
+                st.session_state.commesse[comm] = {}
+            if cod in st.session_state.commesse[comm]:
+                st.warning(f"⚠️ Il codice '{cod}' esiste già in '{comm}'")
+            else:
+                st.session_state.commesse[comm][cod] = {
+                    "nome": nome,
+                    "risorsa": risorsa,
+                    "durata": durata,
+                    "inizio": dt_inizio,
+                    "fine": dt_fine
+                }
+                st.success(f"✅ Attività '{cod}' aggiunta con successo!")
+
+commesse = st.session_state.commesse
 
 if commesse:
     risolvi_sovrapposizioni(commesse)
