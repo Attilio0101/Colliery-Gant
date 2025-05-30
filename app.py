@@ -32,8 +32,12 @@ def aggiungi_lavorativi(inizio, giorni):
         corrente += timedelta(days=1)
     return corrente
 
+def intervalli_compatibili(a_start, a_end, b_start, b_end):
+    return a_end <= b_start or b_end <= a_start
+
 def risolvi_sovrapposizioni(commesse):
     risorse = defaultdict(list)
+    log = []
     for nome, att in commesse.items():
         for codice, dati in att.items():
             risorse[dati["risorsa"]].append({
@@ -54,11 +58,29 @@ def risolvi_sovrapposizioni(commesse):
                 commesse[curr["commessa"]][curr["codice"]]["inizio"] = new_start
                 commesse[curr["commessa"]][curr["codice"]]["fine"] = new_end
 
-# === Streamlit App ===
+    # Verifica sovrapposizioni tra commesse per la stessa risorsa
+    for risorsa, attività in risorse.items():
+        for i in range(len(attività)):
+            for j in range(i+1, len(attività)):
+                a = attività[i]
+                b = attività[j]
+                if a["commessa"] != b["commessa"]:
+                    if not intervalli_compatibili(a["inizio"], a["fine"], b["inizio"], b["fine"]):
+                        old_start = b["inizio"].strftime("%d/%m")
+                        new_start = prossimo_lavorativo(a["fine"] + timedelta(days=1))
+                        new_end = aggiungi_lavorativi(new_start, b["durata"])
+                        commesse[b["commessa"]][b["codice"]]["inizio"] = new_start
+                        commesse[b["commessa"]][b["codice"]]["fine"] = new_end
+                        log.append(f"🔄 Risorsa '{risorsa}': spostata attività '{b['codice']}' della commessa '{b['commessa']}' da {old_start} a {new_start.strftime('%d/%m')}")
+
+    if log:
+        st.warning("\\n".join(log))
+
+# === Streamlit UI ===
 st.set_page_config(layout="wide")
 st.title("📅 Gantt Interattivo – Commesse Fotovoltaiche")
-
 ANNO = 2025
+
 if "commesse" not in st.session_state:
     st.session_state.commesse = {}
 
@@ -70,14 +92,14 @@ if file:
             d["inizio"] = datetime.strptime(d["inizio"], "%Y-%m-%d")
             d["fine"] = datetime.strptime(d["fine"], "%Y-%m-%d")
 
-# === FILTRI ===
+# === Filtri ===
 with st.sidebar:
     st.subheader("📌 Filtri")
     commesse_disponibili = list(st.session_state.commesse.keys())
     filtro_commessa = st.selectbox("Filtra per commessa", ["Tutte"] + commesse_disponibili)
     mese_selezionato = st.selectbox("Filtra per mese", ["Tutti"] + [datetime(ANNO, m, 1).strftime('%B') for m in range(1, 13)])
 
-# === FORM ATTIVITÀ ===
+# === Inserimento attività ===
 with st.sidebar:
     st.subheader("➕ Aggiungi o modifica attività")
     with st.form("inserimento_attivita"):
@@ -116,7 +138,7 @@ with st.sidebar:
                 del st.session_state.commesse[selez_comm]
             st.rerun()
 
-# === VISUALIZZAZIONE GANTT ===
+# === Gantt ===
 commesse = st.session_state.commesse
 if commesse:
     risolvi_sovrapposizioni(commesse)
@@ -159,5 +181,5 @@ if commesse:
         giorno += timedelta(days=1)
     plt.xticks(rotation=45)
     st.pyplot(fig)
-    if st.download_button("💾 Esporta JSON", json.dumps({k: {kk: {**vv, 'inizio': vv['inizio'].strftime('%Y-%m-%d'), 'fine': vv['fine'].strftime('%Y-%m-%d')} for kk, vv in v.items()} for k, v in commesse.items()}, indent=2), file_name="commesse.json"):
-        st.success("✔️ Esportazione completata")
+    st.download_button("💾 Esporta JSON", json.dumps({k: {kk: {**vv, 'inizio': vv['inizio'].strftime('%Y-%m-%d'), 'fine': vv['fine'].strftime('%Y-%m-%d')} for kk, vv in v.items()} for k, v in commesse.items()}, indent=2), file_name="commesse.json")
+
