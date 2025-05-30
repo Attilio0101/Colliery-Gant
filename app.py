@@ -5,6 +5,22 @@ import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 import json
 from collections import defaultdict
+import io
+
+# === Autenticazione semplice ===
+PASSWORD = "Antonello-04"
+if "auth" not in st.session_state:
+    st.session_state.auth = False
+if not st.session_state.auth:
+    pwd = st.text_input("🔒 Inserisci la password per accedere all'app", type="password")
+    if pwd == PASSWORD:
+        st.session_state.auth = True
+        st.rerun()
+    elif pwd != "":
+        st.error("❌ Password errata. Riprova.")
+        st.stop()
+    else:
+        st.stop()
 
 # === Festività italiane 2025 ===
 festivita = {
@@ -74,7 +90,7 @@ def risolvi_sovrapposizioni(commesse):
                         log.append(f"🔄 Risorsa '{risorsa}': spostata attività '{b['codice']}' della commessa '{b['commessa']}' da {old_start} a {new_start.strftime('%d/%m')}")
 
     if log:
-        st.warning("\\n".join(log))
+        st.warning("\n".join(log))
 
 # === Streamlit UI ===
 st.set_page_config(layout="wide")
@@ -181,5 +197,11 @@ if commesse:
         giorno += timedelta(days=1)
     plt.xticks(rotation=45)
     st.pyplot(fig)
+
+    # Download JSON
     st.download_button("💾 Esporta JSON", json.dumps({k: {kk: {**vv, 'inizio': vv['inizio'].strftime('%Y-%m-%d'), 'fine': vv['fine'].strftime('%Y-%m-%d')} for kk, vv in v.items()} for k, v in commesse.items()}, indent=2), file_name="commesse.json")
 
+    # Download PDF
+    pdf_buffer = io.BytesIO()
+    fig.savefig(pdf_buffer, format="pdf")
+    st.download_button("📄 Esporta PDF", pdf_buffer.getvalue(), file_name="gantt.pdf", mime="application/pdf")
