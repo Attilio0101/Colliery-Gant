@@ -10,7 +10,8 @@ import io
 # === Autenticazione semplice ===
 PASSWORD = "Antonello-04"
 if "auth" not in st.session_state:
-    st.session_state.auth = False
+   st.session_state.auth = False
+
 if not st.session_state.auth:
     pwd = st.text_input("🔒 Inserisci la password per accedere all'app", type="password")
     if pwd == PASSWORD:
@@ -201,7 +202,7 @@ if commesse:
     # Download JSON
     st.download_button("💾 Esporta JSON", json.dumps({k: {kk: {**vv, 'inizio': vv['inizio'].strftime('%Y-%m-%d'), 'fine': vv['fine'].strftime('%Y-%m-%d')} for kk, vv in v.items()} for k, v in commesse.items()}, indent=2), file_name="commesse.json")
 
-    # Download PDF
     pdf_buffer = io.BytesIO()
     fig.savefig(pdf_buffer, format="pdf")
-    st.download_button("📄 Esporta PDF", pdf_buffer.getvalue(), file_name="gantt.pdf", mime="application/pdf")
+    pdf_buffer.seek(0)  # <<< questa riga è essenziale
+    st.download_button("📄 Esporta PDF", data=pdf_buffer, file_name="gantt.pdf", mime="application/pdf")
