@@ -70,8 +70,16 @@ if file:
             d["inizio"] = datetime.strptime(d["inizio"], "%Y-%m-%d")
             d["fine"] = datetime.strptime(d["fine"], "%Y-%m-%d")
 
+# === FILTRI ===
 with st.sidebar:
-    st.subheader("➕ Aggiungi attività")
+    st.subheader("📌 Filtri")
+    commesse_disponibili = list(st.session_state.commesse.keys())
+    filtro_commessa = st.selectbox("Filtra per commessa", ["Tutte"] + commesse_disponibili)
+    mese_selezionato = st.selectbox("Filtra per mese", ["Tutti"] + [datetime(ANNO, m, 1).strftime('%B') for m in range(1, 13)])
+
+# === FORM ATTIVITÀ ===
+with st.sidebar:
+    st.subheader("➕ Aggiungi o modifica attività")
     with st.form("inserimento_attivita"):
         comm = st.text_input("Commessa")
         cod = st.text_input("Codice attività")
@@ -79,7 +87,7 @@ with st.sidebar:
         risorsa = st.text_input("Risorsa")
         durata = st.number_input("Durata (gg lavorativi)", 1, 60, 5)
         inizio = st.date_input("Data inizio", datetime(ANNO, 1, 2))
-        submitted = st.form_submit_button("Aggiungi")
+        submitted = st.form_submit_button("Salva o aggiorna")
 
         if submitted:
             dt_inizio = datetime.combine(inizio, datetime.min.time())
@@ -87,20 +95,29 @@ with st.sidebar:
             dt_fine = aggiungi_lavorativi(dt_inizio, durata)
             if comm not in st.session_state.commesse:
                 st.session_state.commesse[comm] = {}
-            if cod in st.session_state.commesse[comm]:
-                st.warning(f"⚠️ Il codice '{cod}' esiste già in '{comm}'")
-            else:
-                st.session_state.commesse[comm][cod] = {
-                    "nome": nome,
-                    "risorsa": risorsa,
-                    "durata": durata,
-                    "inizio": dt_inizio,
-                    "fine": dt_fine
-                }
-                st.success(f"✅ Attività '{cod}' aggiunta con successo!")
+            st.session_state.commesse[comm][cod] = {
+                "nome": nome,
+                "risorsa": risorsa,
+                "durata": durata,
+                "inizio": dt_inizio,
+                "fine": dt_fine
+            }
+            st.success(f"Attività '{cod}' salvata in '{comm}'")
+            st.experimental_rerun()
 
+    st.subheader("🗑️ Elimina attività")
+    if commesse_disponibili:
+        selez_comm = st.selectbox("Commessa da cui eliminare", commesse_disponibili)
+        attività_lista = list(st.session_state.commesse[selez_comm].keys())
+        selez_att = st.selectbox("Attività da eliminare", attività_lista)
+        if st.button("Elimina"):
+            del st.session_state.commesse[selez_comm][selez_att]
+            if not st.session_state.commesse[selez_comm]:
+                del st.session_state.commesse[selez_comm]
+            st.experimental_rerun()
+
+# === VISUALIZZAZIONE GANTT ===
 commesse = st.session_state.commesse
-
 if commesse:
     risolvi_sovrapposizioni(commesse)
     fig, ax = plt.subplots(figsize=(14, max(5, len(commesse))))
@@ -110,8 +127,14 @@ if commesse:
         "montaggio": "#8da0cb", "impianto pali": "#e78ac3",
         "montaggio pannelli": "#a6d854"
     }
-    for i, comm in enumerate(commesse):
+    i = 0
+    for comm in sorted(commesse):
+        if filtro_commessa != "Tutte" and filtro_commessa != comm:
+            continue
         for cod, dati in commesse[comm].items():
+            mese_attivita = dati["inizio"].strftime("%B")
+            if mese_selezionato != "Tutti" and mese_attivita != mese_selezionato:
+                continue
             curr = dati["inizio"]
             col = colori.get(dati["nome"].lower(), "#ffd92f")
             while curr <= dati["fine"]:
@@ -121,11 +144,12 @@ if commesse:
             ax.text(dati["inizio"], i, f"{cod}: {dati['nome']}", va='center', fontsize=7)
         yticks.append(i)
         ylabels.append(comm)
+        i += 1
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels)
     ax.xaxis.set_major_locator(mdates.DayLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))
-    ax.set_title("📊 Gantt con giorni lavorativi e festività escluse")
+    ax.set_title("📊 Gantt con filtri e giorni non lavorativi evidenziati")
     ax.grid(True)
     giorno = min(d["inizio"] for att in commesse.values() for d in att.values())
     fine = max(d["fine"] for att in commesse.values() for d in att.values())
